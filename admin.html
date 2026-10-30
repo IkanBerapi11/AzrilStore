@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portal Admin - Azril Store</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Rajdhani:wght@500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" type="image/jpeg" href="assets/images/azril-store-logo.jpg" />
+
+  <!-- Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    /* Admin Portal Specific Styles */
+    body {
+      background: #090c13;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .admin-navbar {
+      background: rgba(14, 18, 27, 0.95);
+      border-bottom: 1px solid rgba(255, 215, 0, 0.15);
+      padding: 1rem 0;
+    }
+    .admin-container {
+      max-width: 1100px;
+      margin: 2rem auto;
+      padding: 0 1.25rem;
+      flex: 1;
+      width: 100%;
+    }
+    .login-card {
+      max-width: 440px;
+      margin: 4rem auto;
+      background: var(--bg-card);
+      border: 1px solid rgba(255, 215, 0, 0.25);
+      border-radius: 1.25rem;
+      padding: 2.5rem 2rem;
+      box-shadow: var(--shadow-card);
+      text-align: center;
+    }
+    .conn-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.85rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      font-family: var(--font-display);
+      text-transform: uppercase;
+    }
+    .conn-status-badge.online {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(52, 211, 153, 0.4);
+    }
+    .conn-status-badge.local {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(251, 191, 36, 0.4);
+    }
+    .dashboard-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .dash-stat-card {
+      background: var(--bg-card);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 1rem;
+      padding: 1.5rem;
+    }
+    .dash-stat-num {
+      font-family: var(--font-display);
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: var(--gold-bright);
+      line-height: 1.1;
+    }
+    .dash-stat-label {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      margin-top: 0.25rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .dashboard-box {
+      background: var(--bg-card);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 1.25rem;
+      overflow: hidden;
+      margin-bottom: 2.5rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ADMIN NAVBAR -->
+  <header class="admin-navbar">
+    <div class="container" style="display: flex; align-items: center; justify-content: space-between;">
+      <a href="index.html" class="brand-logo">
+        <img
+          src="assets/images/azril-store-logo.jpg"
+          alt="Azril Store Logo"
+          class="brand-logo-img"
+          style="width: 42px; height: 42px;"
+        />
+        <div class="brand-info">
+          <span class="brand-title">AZRIL<span>STORE</span> <span style="font-size: 0.9rem; color: #94a3b8; font-weight: 500;">| PORTAL ADMIN</span></span>
+        </div>
+      </a>
+
+      <div style="display: flex; align-items: center; gap: 1rem;">
+        <span id="connBadge" class="conn-status-badge local">
+          <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:currentColor;"></span>
+          Mode Lokal (LocalStorage)
+        </span>
+        <a href="index.html" class="btn btn-outline btn-sm" title="Kembali ke Toko Pelanggan">
+          &larr; Lihat Website Toko
+        </a>
+        <button id="btnLogout" class="btn btn-outline btn-sm" style="display: none;" onclick="adminLogout()">
+          Keluar
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- SCREEN 1: LOGIN ADMIN SCREEN -->
+  <main id="authScreen" class="admin-container" style="display: block;">
+    <div class="login-card">
+      <div style="margin: 0 auto 1.25rem; display: flex; justify-content: center;">
+        <img
+          src="assets/images/azril-store-logo.jpg"
+          alt="Azril Store"
+          style="width: 68px; height: 68px; border-radius: 16px; object-fit: cover; box-shadow: 0 0 20px rgba(20, 145, 155, 0.45); border: 2px solid rgba(20, 145, 155, 0.6);"
+        />
+      </div>
+
+      <h2 style="color: #fff; font-size: 1.75rem; margin-bottom: 0.5rem;">Masuk ke Panel Admin</h2>
+      <p style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 2rem;">Hanya pemilik toko yang memiliki akses untuk mengelola stok akun.</p>
+
+      <!-- Tab Login: PIN Cepat vs Akun Supabase -->
+      <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.5rem;">
+        <button id="btnTabPin" class="admin-tab active" style="flex: 1; justify-content: center;" onclick="switchAuthTab('pin')">
+          🔑 PIN Admin
+        </button>
+        <button id="btnTabSupabase" class="admin-tab" style="flex: 1; justify-content: center;" onclick="switchAuthTab('supabase')">
+          ⚡ Supabase Cloud
+        </button>
+      </div>
+
+      <!-- Form 1: Master PIN (Default: admin123) -->
+      <form id="formPinLogin" onsubmit="handlePinLogin(event)">
+        <div class="input-group" style="text-align: left;">
+          <label class="input-label" for="adminPinInput">Masukkan PIN Admin</label>
+          <input type="password" class="input-text" id="adminPinInput" placeholder="Default PIN: admin123" required />
+          <div class="input-helper">PIN standar awal: <strong>admin123</strong> (dapat diubah di dashboard)</div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1.5rem;">
+          Masuk ke Dashboard Admin
+        </button>
+      </form>
+
+      <!-- Form 2: Supabase Email/Password Login -->
+      <form id="formSupabaseLogin" style="display: none;" onsubmit="handleSupabaseLogin(event)">
+        <div class="input-group" style="text-align: left;">
+          <label class="input-label" for="sbEmailInput">Email Admin Supabase</label>
+          <input type="email" class="input-text" id="sbEmailInput" placeholder="admin@tokomu.com" required />
+        </div>
+        <div class="input-group" style="text-align: left;">
+          <label class="input-label" for="sbPasswordInput">Password</label>
+          <input type="password" class="input-text" id="sbPasswordInput" placeholder="••••••••" required />
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1.5rem;">
+          Login dengan Supabase Auth
+        </button>
+      </form>
+    </div>
+  </main>
+
+  <!-- SCREEN 2: ADMIN DASHBOARD (AFTER LOGIN) -->
+  <main id="dashboardScreen" class="admin-container" style="display: none;">
+    <!-- Dashboard Stats Grid -->
+    <div class="dashboard-stats-grid">
+      <div class="dash-stat-card">
+        <div class="dash-stat-num" id="dashTotalCount">0</div>
+        <div class="dash-stat-label">Total Akun Terdaftar</div>
+      </div>
+      <div class="dash-stat-card">
+        <div class="dash-stat-num" id="dashReadyCount" style="color: #34d399;">0</div>
+        <div class="dash-stat-label">Stok Ready (Tersedia)</div>
+      </div>
+      <div class="dash-stat-card">
+        <div class="dash-stat-num" id="dashSoldCount" style="color: #f87171;">0</div>
+        <div class="dash-stat-label">Akun Terjual (Sold)</div>
+      </div>
+      <div class="dash-stat-card">
+        <div class="dash-stat-num" id="dashTotalValue" style="font-size: 1.7rem;">Rp 0</div>
+        <div class="dash-stat-label">Total Nilai Stok Ready</div>
+      </div>
+    </div>
+
+    <!-- Main Admin Tabs Card -->
+    <div class="dashboard-box">
+      <!-- Tabs Header -->
+      <div class="admin-tabs" style="padding-top: 1rem;">
+        <button class="admin-tab active" data-pane="tabPaneStock" onclick="switchDashPane('tabPaneStock')">
+          📋 Kelola & Daftar Stok Akun
+        </button>
+        <button class="admin-tab" data-pane="tabPaneAdd" onclick="switchDashPane('tabPaneAdd')">
+          ➕ Tambah Akun Baru
+        </button>
+        <button class="admin-tab" data-pane="tabPaneDatabase" onclick="switchDashPane('tabPaneDatabase')">
+          🗄️ Koneksi Supabase (Database Cloud)
+        </button>
+        <button class="admin-tab" data-pane="tabPaneSettings" onclick="switchDashPane('tabPaneSettings')">
+          ⚙️ Pengaturan Toko & PIN
+        </button>
+      </div>
+
+      <!-- PANE 1: KELOLA STOK -->
+      <div class="admin-content-pane active" id="tabPaneStock">
+        <div class="stock-manager-header">
+          <div>
+            <h3 style="color: #fff; font-size: 1.3rem;">Katalog Stok Akun Anda</h3>
+            <p style="font-size: 0.85rem; color: #94a3b8;">Klik tombol status untuk mengubah status akun dari READY ke TERJUAL seketika.</p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="switchDashPane('tabPaneAdd')">
+            + Tambah Akun Baru
+          </button>
+        </div>
+
+        <div class="stock-list-container" id="adminStockTable" style="max-height: 550px;">
+          <!-- Rendered via JavaScript -->
+        </div>
+
+        <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.06); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+          <span style="font-size: 0.8rem; color: #64748b;">Perubahan langsung tersinkronisasi ke katalog pembeli di index.html</span>
+          <button class="btn btn-outline btn-sm" onclick="handleResetDefaultStock()" style="color: #f87171; border-color: rgba(239,68,68,0.3);">
+            🔄 Reset ke Stok Default
+          </button>
+        </div>
+      </div>
+
+      <!-- PANE 2: FORM TAMBAH AKUN -->
+      <div class="admin-content-pane" id="tabPaneAdd">
+        <form id="dashFormAdd" onsubmit="handleDashAddStock(event)">
+          <div class="form-grid-2">
+            <div class="input-group">
+              <label class="input-label" for="dAddCode">Kode Akun</label>
+              <input type="text" class="input-text" id="dAddCode" placeholder="Contoh: #COC-1608" required />
+            </div>
+
+            <div class="input-group">
+              <label class="input-label" for="dAddTH">Level Town Hall</label>
+              <select class="input-select" id="dAddTH" required>
+                <option value="17">Town Hall 17</option>
+                <option value="16" selected>Town Hall 16</option>
+                <option value="15">Town Hall 15</option>
+                <option value="14">Town Hall 14</option>
+                <option value="13">Town Hall 13</option>
+                <option value="12">Town Hall 12</option>
+                <option value="11">Town Hall 11</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="input-group">
+              <label class="input-label" for="dAddTitle">Judul Akun</label>
+              <input type="text" class="input-text" id="dAddTitle" placeholder="Contoh: TH 16 Max Hero - Full Defense" required />
+            </div>
+
+            <div class="input-group">
+              <label class="input-label" for="dAddStatus">Status Stok Awal</label>
+              <select class="input-select" id="dAddStatus">
+                <option value="ready" selected>🟢 READY (Tersedia)</option>
+                <option value="sold">🔴 SOLD (Terjual)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="input-group">
+              <label class="input-label" for="dAddPrice">Harga Jual Bersih (Rp)</label>
+              <input type="number" class="input-text" id="dAddPrice" placeholder="Contoh: 950000" min="0" required />
+            </div>
+
+            <div class="input-group">
+              <label class="input-label" for="dAddOriginalPrice">Harga Coret / Promo (Rp)</label>
+              <input type="number" class="input-text" id="dAddOriginalPrice" placeholder="Contoh: 1250000" min="0" required />
+            </div>
+          </div>
+
+          <!-- Hero Levels Grid -->
+          <div class="input-group">
+            <label class="input-label">Level Hero (Pahlawan)</label>
+            <div class="form-grid-4">
+              <div>
+                <input type="number" class="input-text" id="dAddBK" placeholder="King (BK)" min="0" max="95" required />
+                <div class="input-helper" style="text-align: center;">Barbarian King</div>
+              </div>
+              <div>
+                <input type="number" class="input-text" id="dAddAQ" placeholder="Queen (AQ)" min="0" max="95" required />
+                <div class="input-helper" style="text-align: center;">Archer Queen</div>
+              </div>
+              <div>
+                <input type="number" class="input-text" id="dAddGW" placeholder="Warden (GW)" min="0" max="70" required />
+                <div class="input-helper" style="text-align: center;">Grand Warden</div>
+              </div>
+              <div>
+                <input type="number" class="input-text" id="dAddRC" placeholder="Champ (RC)" min="0" max="45" required />
+                <div class="input-helper" style="text-align: center;">Royal Champion</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Specs Info Grid -->
+          <div class="form-grid-3">
+            <div class="input-group">
+              <label class="input-label" for="dAddGems">Jumlah Gems</label>
+              <input type="text" class="input-text" id="dAddGems" placeholder="Contoh: 3.500" value="2.500" />
+            </div>
+
+            <div class="input-group">
+              <label class="input-label" for="dAddTrophies">Trophy / Liga</label>
+              <input type="text" class="input-text" id="dAddTrophies" placeholder="Contoh: 5.400 (Legends)" value="3.500 (Titan)" />
+            </div>
+
+            <div class="input-group">
+              <label class="input-label" for="dAddChangeName">Ganti Nama</label>
+              <select class="input-select" id="dAddChangeName">
+                <option value="Gratis (Free)">Gratis (Free Name Change)</option>
+                <option value="500 Gems">500 Gems</option>
+                <option value="1000 Gems">1000 Gems</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Screenshot Image -->
+          <div class="input-group">
+            <label class="input-label">Pilih Screenshot Base CoC</label>
+            <div class="preset-image-grid" id="dPresetGrid">
+              <div class="preset-thumb selected" data-img="assets/images/th16-max.jpg" onclick="selectDashPreset(this)">
+                <img src="assets/images/th16-max.jpg" alt="TH 16" />
+              </div>
+              <div class="preset-thumb" data-img="assets/images/th17-elite.jpg" onclick="selectDashPreset(this)">
+                <img src="assets/images/th17-elite.jpg" alt="TH 17" />
+              </div>
+              <div class="preset-thumb" data-img="assets/images/th15-semi.jpg" onclick="selectDashPreset(this)">
+                <img src="assets/images/th15-semi.jpg" alt="TH 15" />
+              </div>
+              <div class="preset-thumb" data-img="assets/images/th14-jungle.jpg" onclick="selectDashPreset(this)">
+                <img src="assets/images/th14-jungle.jpg" alt="TH 14" />
+              </div>
+              <div class="preset-thumb" data-img="assets/images/th13-ice.jpg" onclick="selectDashPreset(this)">
+                <img src="assets/images/th13-ice.jpg" alt="TH 13" />
+              </div>
+            </div>
+
+            <div style="margin-top: 0.75rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+              <span style="font-size: 0.8rem; color: #94a3b8;">Atau upload screenshot sendiri:</span>
+              <input type="file" id="dCustomFileInput" accept="image/*" class="input-text" style="padding: 0.45rem; font-size: 0.85rem; width: auto;" onchange="handleDashCustomFile(event)" />
+            </div>
+            <input type="hidden" id="dSelectedImg" value="assets/images/th16-max.jpg" />
+          </div>
+
+          <div class="input-group">
+            <label class="input-label" for="dAddDescription">Deskripsi Akun</label>
+            <textarea class="input-textarea" id="dAddDescription">Akun pribadi rawatan, troops dan hero equipment level tinggi, Supercell ID aman 100% dan siap pindah ke email pribadi pembeli.</textarea>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1rem;">
+            💾 Simpan & Terbitkan ke Katalog
+          </button>
+        </form>
+      </div>
+
+      <!-- PANE 3: KONEKSI SUPABASE -->
+      <div class="admin-content-pane" id="tabPaneDatabase">
+        <div style="max-width: 680px; margin: 0 auto; padding: 1rem 0;">
+          <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+            <div style="width: 48px; height: 48px; background: rgba(52, 211, 153, 0.15); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #34d399;">
+              <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 16h-2v-6h2v6zm0-8h-2V7h2v3z"/>
+              </svg>
+            </div>
+            <div>
+              <h3 style="color: #fff; font-size: 1.3rem;">Hubungkan Supabase Cloud Database</h3>
+              <p style="font-size: 0.85rem; color: #94a3b8;">Menghubungkan database cloud agar data akun CoC tersimpan secara online dan dapat diakses pembeli dari seluruh dunia secara realtime.</p>
+            </div>
+          </div>
+
+          <div style="background: rgba(11, 13, 19, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 0.85rem; padding: 1.25rem; margin-bottom: 1.5rem; font-size: 0.85rem; line-height: 1.6; color: #cbd5e1;">
+            <strong style="color: var(--gold-bright);">📌 Panduan Cepat Supabase (3 Menit Selesai):</strong>
+            <ol style="margin-left: 1.25rem; margin-top: 0.5rem;">
+              <li>Buat project gratis di <a href="https://supabase.com" target="_blank" rel="noopener" style="color: #38bdf8;">supabase.com</a>.</li>
+              <li>Buka menu <strong>SQL Editor</strong> di dashboard Supabase Anda.</li>
+              <li>Salin dan jalankan seluruh isi file <strong style="color: var(--gold-bright);">schema.sql</strong> yang ada di folder proyek ini.</li>
+              <li>Buka <strong>Project Settings &rarr; API</strong>, lalu salin <em>Project URL</em> dan <em>anon/public key</em> ke form di bawah ini.</li>
+            </ol>
+          </div>
+
+          <div class="input-group">
+            <label class="input-label" for="sbUrlInput">Project URL Supabase</label>
+            <input type="text" class="input-text" id="sbUrlInput" placeholder="https://xxxxxxxx.supabase.co" />
+          </div>
+
+          <div class="input-group">
+            <label class="input-label" for="sbKeyInput">Project API Anon Key</label>
+            <input type="password" class="input-text" id="sbKeyInput" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." />
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+            <button class="btn btn-primary" style="flex: 1;" onclick="handleSaveSupabaseCreds()">
+              Hubungkan Database Supabase
+            </button>
+            <button class="btn btn-outline" onclick="handleDisconnectSupabase()">
+              Putuskan (Gunakan Mode Lokal)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PANE 4: PENGATURAN TOKO & PIN -->
+      <div class="admin-content-pane" id="tabPaneSettings">
+        <div style="max-width: 550px; margin: 0 auto; padding: 1rem 0;">
+          <h3 style="color: #fff; font-size: 1.2rem; margin-bottom: 1rem;">Pengaturan WhatsApp & Keamanan Admin</h3>
+
+          <!-- WhatsApp Phone -->
+          <div class="input-group">
+            <label class="input-label" for="dashWaPhoneInput">Nomor WhatsApp Admin Toko</label>
+            <input type="text" class="input-text" id="dashWaPhoneInput" placeholder="Contoh: 081234567890" />
+            <div class="input-helper">Nomor yang menerima pesan otomatis saat pembeli klik "Beli via WA".</div>
+          </div>
+
+          <!-- Custom Master PIN -->
+          <div class="input-group" style="margin-top: 1.5rem;">
+            <label class="input-label" for="dashNewPinInput">Ubah PIN Masuk Admin</label>
+            <input type="password" class="input-text" id="dashNewPinInput" placeholder="Masukkan PIN baru Anda" />
+            <div class="input-helper">Kosongkan jika tidak ingin mengubah PIN admin saat ini.</div>
+          </div>
+
+          <button class="btn btn-primary btn-block" style="margin-top: 1.5rem;" onclick="handleSaveDashSettings()">
+            Simpan Pengaturan
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- GLOBAL TOAST NOTIFICATION -->
+  <div class="toast" id="globalToast">
+    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>
+    <span id="toastMsg">Berhasil!</span>
+  </div>
+
+  <!-- Scripts -->
+  <script src="supabase.js"></script>
+  <script src="script.js"></script>
+
+  <script>
+    // Admin Portal Specific Controller Logic
+    let currentAuthMode = "pin";
+
+    function switchAuthTab(mode) {
+      currentAuthMode = mode;
+      document.getElementById("btnTabPin").classList.toggle("active", mode === "pin");
+      document.getElementById("btnTabSupabase").classList.toggle("active", mode === "supabase");
+      document.getElementById("formPinLogin").style.display = mode === "pin" ? "block" : "none";
+      document.getElementById("formSupabaseLogin").style.display = mode === "supabase" ? "block" : "none";
+    }
+
+    function switchDashPane(paneId) {
+      document.querySelectorAll("#dashboardScreen .admin-tab").forEach(tab => {
+        tab.classList.toggle("active", tab.dataset.pane === paneId);
+      });
+      document.querySelectorAll("#dashboardScreen .admin-content-pane").forEach(pane => {
+        pane.classList.toggle("active", pane.id === paneId);
+      });
+    }
+
+    // Check Login State
+    function checkAdminAuth() {
+      const isAuth = sessionStorage.getItem("pojox_admin_session") === "true";
+      document.getElementById("authScreen").style.display = isAuth ? "none" : "block";
+      document.getElementById("dashboardScreen").style.display = isAuth ? "block" : "none";
+      document.getElementById("btnLogout").style.display = isAuth ? "inline-flex" : "none";
+
+      if (isAuth) {
+        initDashboardView();
+      }
+    }
+
+    // PIN Login
+    function handlePinLogin(e) {
+      e.preventDefault();
+      const inputPin = document.getElementById("adminPinInput").value.trim();
+      const savedPin = localStorage.getItem("pojox_admin_pin") || "admin123";
+
+      if (inputPin === savedPin) {
+        sessionStorage.setItem("pojox_admin_session", "true");
+        showToast("Login berhasil! Selamat datang di Panel Admin.");
+        checkAdminAuth();
+      } else {
+        alert("PIN salah! Default PIN adalah: admin123");
+      }
+    }
+
+    // Supabase Login
+    async function handleSupabaseLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById("sbEmailInput").value.trim();
+      const pass = document.getElementById("sbPasswordInput").value.trim();
+
+      try {
+        await apiAdminLogin(email, pass);
+        sessionStorage.setItem("pojox_admin_session", "true");
+        showToast("Login Supabase berhasil!");
+        checkAdminAuth();
+      } catch (err) {
+        alert("Gagal login Supabase: " + err.message);
+      }
+    }
+
+    function adminLogout() {
+      sessionStorage.removeItem("pojox_admin_session");
+      apiAdminLogout();
+      showToast("Anda telah keluar dari Panel Admin.");
+      checkAdminAuth();
+    }
+
+    // Dashboard Initialization
+    async function initDashboardView() {
+      // Sync Supabase inputs
+      document.getElementById("sbUrlInput").value = localStorage.getItem("pojox_supabase_url") || "";
+      document.getElementById("sbKeyInput").value = localStorage.getItem("pojox_supabase_anon_key") || "";
+      document.getElementById("dashWaPhoneInput").value = getAdminPhone();
+
+      // Update badge
+      const isOnline = isSupabaseActive();
+      const badge = document.getElementById("connBadge");
+      if (isOnline) {
+        badge.className = "conn-status-badge online";
+        badge.innerHTML = `<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:currentColor;"></span> Supabase Cloud Terhubung`;
+      } else {
+        badge.className = "conn-status-badge local";
+        badge.innerHTML = `<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:currentColor;"></span> Mode Lokal (LocalStorage)`;
+      }
+
+      // Fetch accounts
+      ACCOUNTS_DATA = await apiGetAccounts();
+      renderDashboardStockList();
+      updateDashboardStats();
+    }
+
+    function updateDashboardStats() {
+      const total = ACCOUNTS_DATA.length;
+      const ready = ACCOUNTS_DATA.filter(a => a.status === "ready").length;
+      const sold = ACCOUNTS_DATA.filter(a => a.status === "sold").length;
+      const totalVal = ACCOUNTS_DATA.filter(a => a.status === "ready").reduce((sum, a) => sum + a.price, 0);
+
+      document.getElementById("dashTotalCount").textContent = total;
+      document.getElementById("dashReadyCount").textContent = ready;
+      document.getElementById("dashSoldCount").textContent = sold;
+      document.getElementById("dashTotalValue").textContent = formatRupiah(totalVal);
+    }
+
+    function renderDashboardStockList() {
+      const table = document.getElementById("adminStockTable");
+      if (!table) return;
+
+      if (ACCOUNTS_DATA.length === 0) {
+        table.innerHTML = `
+          <div style="text-align: center; padding: 2.5rem; color: #94a3b8;">
+            <p>Belum ada stok akun terdaftar.</p>
+          </div>
+        `;
+        return;
+      }
+
+      table.innerHTML = ACCOUNTS_DATA.map(account => {
+        const isSold = account.status === "sold";
+        return `
+          <div class="stock-item-row">
+            <div class="stock-item-info">
+              <img src="${account.image}" alt="${account.title}" class="stock-item-thumb" />
+              <div class="stock-item-meta">
+                <div class="stock-item-title">${account.title}</div>
+                <div class="stock-item-details">
+                  <span style="color: var(--gold-bright); font-weight: 700;">${account.code}</span>
+                  <span>TH ${account.th}</span>
+                  <span>${formatRupiah(account.price)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="stock-item-actions">
+              <button 
+                class="btn-status-toggle ${isSold ? 'is-sold' : 'is-ready'}" 
+                onclick="handleDashToggleStatus('${account.code}')" 
+                title="Ubah status"
+              >
+                ${isSold ? '🔴 TERJUAL' : '🟢 READY'}
+              </button>
+              <button 
+                class="btn-delete-stock" 
+                onclick="handleDashDeleteStock('${account.code}')" 
+                title="Hapus akun"
+              >
+                Hapus
+              </button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    async function handleDashToggleStatus(code) {
+      const account = ACCOUNTS_DATA.find(a => a.code === code);
+      if (!account) return;
+      const newStatus = account.status === "ready" ? "sold" : "ready";
+      account.status = newStatus;
+
+      await apiUpdateStatus(code, newStatus);
+      saveAccountsToStorage();
+      renderDashboardStockList();
+      updateDashboardStats();
+      showToast(`Status akun ${code} diubah menjadi: ${newStatus.toUpperCase()}`);
+    }
+
+    async function handleDashDeleteStock(code) {
+      if (!confirm(`Hapus akun ${code} secara permanen?`)) return;
+
+      await apiDeleteAccount(code);
+      ACCOUNTS_DATA = ACCOUNTS_DATA.filter(a => a.code !== code);
+      saveAccountsToStorage();
+      renderDashboardStockList();
+      updateDashboardStats();
+      showToast(`Akun ${code} berhasil dihapus.`);
+    }
+
+    function handleResetDefaultStock() {
+      if (!confirm("Kembalikan seluruh daftar akun ke bawaan awal?")) return;
+      ACCOUNTS_DATA = [...DEFAULT_ACCOUNTS_DATA];
+      saveAccountsToStorage();
+      renderDashboardStockList();
+      updateDashboardStats();
+      showToast("Daftar akun direset ke setelan bawaan!");
+    }
+
+    function selectDashPreset(el) {
+      document.querySelectorAll("#dPresetGrid .preset-thumb").forEach(t => t.classList.remove("selected"));
+      el.classList.add("selected");
+      document.getElementById("dSelectedImg").value = el.dataset.img;
+    }
+
+    function handleDashCustomFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        document.getElementById("dSelectedImg").value = evt.target.result;
+        document.querySelectorAll("#dPresetGrid .preset-thumb").forEach(t => t.classList.remove("selected"));
+        showToast("Screenshot berhasil dimuat!");
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function handleDashAddStock(e) {
+      e.preventDefault();
+      const code = document.getElementById("dAddCode").value.trim().toUpperCase();
+      const th = parseInt(document.getElementById("dAddTH").value);
+      const title = document.getElementById("dAddTitle").value.trim();
+      const status = document.getElementById("dAddStatus").value;
+      const price = parseInt(document.getElementById("dAddPrice").value) || 0;
+      const originalPrice = parseInt(document.getElementById("dAddOriginalPrice").value) || price;
+
+      const bk = parseInt(document.getElementById("dAddBK").value) || 0;
+      const aq = parseInt(document.getElementById("dAddAQ").value) || 0;
+      const gw = parseInt(document.getElementById("dAddGW").value) || 0;
+      const rc = parseInt(document.getElementById("dAddRC").value) || 0;
+
+      const gems = document.getElementById("dAddGems").value.trim() || "1.000";
+      const trophies = document.getElementById("dAddTrophies").value.trim() || "3.000";
+      const changeName = document.getElementById("dAddChangeName").value;
+      const image = document.getElementById("dSelectedImg").value || "assets/images/th16-max.jpg";
+      const description = document.getElementById("dAddDescription").value.trim();
+
+      const exists = ACCOUNTS_DATA.some(a => a.code.toLowerCase() === code.toLowerCase());
+      if (exists) {
+        alert(`Kode akun ${code} sudah terdaftar! Gunakan kode lain.`);
+        return;
+      }
+
+      const newAccount = {
+        id: Date.now(),
+        code,
+        title,
+        th,
+        status,
+        price,
+        originalPrice,
+        image,
+        heroes: { bk, aq, gw, rc },
+        gems,
+        cwlMedals: "500",
+        changeName,
+        scidStatus: "Clean Email (Supercell ID)",
+        trophies,
+        equipment: "Hero Equipment Lengkap",
+        pets: th >= 14 ? "Battle Pets Siap" : "Belum terbuka (TH14+)",
+        description
+      };
+
+      await apiAddAccount(newAccount);
+      ACCOUNTS_DATA.unshift(newAccount);
+      saveAccountsToStorage();
+
+      showToast(`✅ Akun ${code} berhasil diterbitkan!`);
+      document.getElementById("dashFormAdd").reset();
+      document.getElementById("dSelectedImg").value = "assets/images/th16-max.jpg";
+      switchDashPane("tabPaneStock");
+      renderDashboardStockList();
+      updateDashboardStats();
+    }
+
+    function handleSaveSupabaseCreds() {
+      const url = document.getElementById("sbUrlInput").value.trim();
+      const key = document.getElementById("sbKeyInput").value.trim();
+      if (!url || !key) {
+        alert("Silakan masukkan URL dan Anon Key Supabase yang lengkap!");
+        return;
+      }
+      saveSupabaseCredentials(url, key);
+      showToast("Kredensial Supabase berhasil disimpan!");
+      initDashboardView();
+    }
+
+    function handleDisconnectSupabase() {
+      localStorage.removeItem("pojox_supabase_url");
+      localStorage.removeItem("pojox_supabase_anon_key");
+      initSupabase();
+      showToast("Supabase diputuskan. Menggunakan LocalStorage!");
+      initDashboardView();
+    }
+
+    function handleSaveDashSettings() {
+      const wa = document.getElementById("dashWaPhoneInput").value.trim();
+      const newPin = document.getElementById("dashNewPinInput").value.trim();
+
+      if (wa) {
+        setAdminPhone(wa);
+      }
+      if (newPin) {
+        localStorage.setItem("pojox_admin_pin", newPin);
+      }
+      showToast("Pengaturan toko & PIN admin berhasil disimpan!");
+    }
+
+    // Auto initialize on load
+    document.addEventListener("DOMContentLoaded", () => {
+      initSupabase();
+      checkAdminAuth();
+    });
+  </script>
+</body>
+</html>
